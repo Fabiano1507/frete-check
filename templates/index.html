@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Conferência de Frete CT-e</title>
+</head>
+<body>
+
+    <h2>📦 Conferência de Frete - CT-e</h2>
+
+    <form action="/processar" method="post" enctype="multipart/form-data">
+
+        <p>
+            <label>XML do CT-e (pode selecionar vários):</label><br>
+            <input type="file" name="xml" multiple required>
+        </p>
+
+        <p>
+            <label>Tabela de Frete (Excel):</label><br>
+            <input type="file" name="tabela" required>
+        </p>
+
+        <button type="submit">🔍 Conferir Frete</button>
+
+    </form>
+
+</body>
+</html>

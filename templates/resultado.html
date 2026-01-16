@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Resultado da Conferência de Frete</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        th {
+            background-color: #2c3e50;
+            color: white;
+        }
+
+        .ok {
+            background-color: #c8e6c9;
+            font-weight: bold;
+        }
+
+        .maior {
+            background-color: #ffcdd2;
+            font-weight: bold;
+        }
+
+        .menor {
+            background-color: #fff9c4;
+            font-weight: bold;
+        }
+
+        .acoes {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+<h1>📊 Resultado da Conferência de Frete</h1>
+
+<div class="acoes">
+    <a href="/exportar_excel">
+        <button class="btn">📥 Exportar para Excel</button>
+    </a>
+
+    <a href="/">
+        <button class="btn">⬅️ Nova Conferência</button>
+    </a>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>CT-e</th>
+            <th>Origem</th>
+            <th>Destino</th>
+            <th>Peso</th>
+            <th>Valor Tabela</th>
+            <th>Valor Cobrado</th>
+            <th>Diferença</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in resultados %}
+        <tr class="
+            {% if r.status == 'OK' %}
+                ok
+            {% elif r.status == 'A MAIOR' %}
+                maior
+            {% else %}
+                menor
+            {% endif %}
+        ">
+            <td>{{ r.cte }}</td>
+            <td>{{ r.origem }}</td>
+            <td>{{ r.destino }}</td>
+            <td>{{ r.peso }}</td>
+            <td>R$ {{ "%.2f"|format(r.valor_tabela) }}</td>
+            <td>R$ {{ "%.2f"|format(r.valor_cobrado) }}</td>
+            <td>R$ {{ "%.2f"|format(r.diferenca) }}</td>
+            <td>{{ r.status }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+</body>
+</html>
