@@ -1,28 +1,118 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Conferência de Frete CT-e</title>
+    <title>Conferência de Frete</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 50px auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 15px;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        button {
+            margin-top: 25px;
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .info {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #888;
+        }
+    </style>
 </head>
 <body>
 
-    <h2>📦 Conferência de Frete - CT-e</h2>
+<div class="container">
+    <h1>Conferência de Frete</h1>
 
     <form action="/processar" method="post" enctype="multipart/form-data">
 
-        <p>
-            <label>XML do CT-e (pode selecionar vários):</label><br>
-            <input type="file" name="xml" multiple required>
-        </p>
+        <label for="xml">
+            XML do CT-e (pode selecionar vários):
+        </label>
+        <input 
+            type="file" 
+            id="xml" 
+            name="xml" 
+            accept=".xml" 
+            multiple 
+            required
+        >
 
-        <p>
-            <label>Tabela de Frete (Excel):</label><br>
-            <input type="file" name="tabela" required>
-        </p>
+        <label for="tabela">
+            Tabela de Frete (Excel):
+        </label>
+        <input 
+            type="file" 
+            id="tabela" 
+            name="tabela" 
+            accept=".xlsx,.xls" 
+            required
+        >
 
-        <button type="submit">🔍 Conferir Frete</button>
-
+        <button type="submit">
+            Processar Conferência
+        </button>
     </form>
+
+    <div class="info">
+        <p>
+            • O sistema irá ler automaticamente os dados do CT-e.<br>
+            • A conferência será feita com base no peso cubado / M³.<br>
+            • A tabela deve conter regras por região (Capital / Interior).
+        </p>
+    </div>
+</div>
+
+<footer>
+    © Conferência de Frete – Sistema Interno
+</footer>
 
 </body>
 </html>
