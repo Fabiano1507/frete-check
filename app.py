@@ -1,182 +1,241 @@
-from flask import Flask, render_template, request, send_file
+print(">>> APP.PY CARREGADO <<<")
+
+import os
+import math
 import pandas as pd
 import xml.etree.ElementTree as ET
-import io
-from datetime import datetime
-import os
+from flask import Flask, render_template, request, send_file
+from io import BytesIO
 
 app = Flask(__name__)
 
-# =========================
-# CONFIGURAÇÕES
-# =========================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-FATOR_CUBAGEM = 300  # kg por m³ (ajustável por cliente)
-
-# =========================
-# FUNÇÕES AUXILIARES
-# =========================
-
-def ler_cte_xml(arquivo):
-    """
-    Lê os principais dados do CT-e:
-    - Número do CT-e
-    - UF origem
-    - UF destino
-    - Peso cubado (kg)
-    - Valor cobrado
-    """
-    tree = ET.parse(arquivo)
-    root = tree.getroot()
-
-    ns = {'cte': 'http://www.portalfiscal.inf.br/cte'}
-
-    numero_cte = root.find('.//cte:nCT', ns)
-    uf_origem = root.find('.//cte:UFIni', ns)
-    uf_destino = root.find('.//cte:UFFim', ns)
-    peso = root.find('.//cte:qCarga', ns)
-    valor = root.find('.//cte:vTPrest', ns)
-
-    peso_cubado = float(peso.text) if peso is not None else 0.0
-    valor_cobrado = float(valor.text) if valor is not None else 0.0
-
-    m3 = round(peso_cubado / FATOR_CUBAGEM, 4) if peso_cubado > 0 else 0.0
-
-    return {
-        'cte': numero_cte.text if numero_cte is not None else 'N/A',
-        'origem': uf_origem.text.upper() if uf_origem is not None else '',
-        'destino': uf_destino.text.upper() if uf_destino is not None else '',
-        'peso_cubado': peso_cubado,
-        'm3': m3,
-        'valor_cobrado': valor_cobrado
+# -------------------------
+# CONFIGURAÇÃO POR CLIENTE
+# -------------------------
+CLIENTES = {
+    "britania_joinville": {
+        "frete": "britania_joinville.csv",
+        "icms": "tabela_icms_dentro_origem_sc.csv",
+        "origem_nome": "Joinville",
+        "uf_origem": "SC"
+    },
+    "britania_linhares": {
+        "frete": "britania_linhares.csv",
+        "icms": "tabela_icms_dentro_origem_es.csv",
+        "origem_nome": "Linhares",
+        "uf_origem": "ES"
     }
+}
 
+# Tabela fixa
+TABELA_REGIOES = pd.read_csv(
+    os.path.join(BASE_DIR, "tabelas", "regioes_grande_capital.csv")
+)
 
-def identificar_regiao(destino):
-    """
-    Regra simples inicial:
-    Pode ser expandida depois (capital/interior por UF ou cidade)
-    """
-    capitais = [
-        'SP', 'RJ', 'BH', 'POA', 'CURITIBA', 'SALVADOR', 'RECIFE',
-        'FORTALEZA', 'BELO HORIZONTE'
+# -------------------------
+# UTILIDADES
+# -------------------------
+def identificar_tipo_destino(uf, cidade):
+    cidade = cidade.upper().strip()
+    linha = TABELA_REGIOES[
+        (TABELA_REGIOES["uf"] == uf) &
+        (TABELA_REGIOES["cidade"] == cidade)
     ]
-
-    if destino in ['SP', 'RJ', 'MG', 'BA', 'CE', 'PE', 'RS', 'PR']:
-        return 'CAPITAL'
-    else:
-        return 'INTERIOR'
+    return linha.iloc[0]["regiao"] if not linha.empty else "INTERIOR"
 
 
-def buscar_valor_tabela(df, percurso, regiao, m3):
-    """
-    Busca o valor correto na tabela Britânia (ou similar)
-    """
-    linha = df[
-        (df['percurso'] == percurso) &
-        (df['regiao'] == regiao) &
-        (df['m3_min'] <= m3) &
-        (df['m3_max'] >= m3)
+def obter_divisor_icms(tabela_icms, uf_origem, uf_destino):
+    linha = tabela_icms[
+        (tabela_icms["uf_origem"] == uf_origem) &
+        (tabela_icms["uf_destino"] == uf_destino)
+    ]
+    return linha.iloc[0]["divisor"] if not linha.empty else 1
+
+
+# -------------------------
+# LEITURA XML CT-e
+# -------------------------
+def ler_cte_xml(arquivo, origem_nome, uf_origem):
+    ns = {"ns": "http://www.portalfiscal.inf.br/cte"}
+    root = ET.parse(arquivo).getroot()
+
+    def get_text(path):
+        el = root.find(path, ns)
+        return el.text.strip() if el is not None else ""
+
+    cte = {}
+    cte["numero"] = get_text(".//ns:nCT")
+    cte["uf_origem"] = uf_origem
+    cte["uf_destino"] = get_text(".//ns:UFFim")
+    cte["cidade_destino"] = get_text(".//ns:xMunFim")
+    cte["origem"] = origem_nome
+
+    peso_declarado = 0
+    peso_cubado = 0
+    m3 = 0
+
+    for infq in root.findall(".//ns:infQ", ns):
+        tp = infq.find("ns:tpMed", ns)
+        if tp is None:
+            continue
+
+        valor = float(infq.find("ns:qCarga", ns).text.replace(",", "."))
+
+        if tp.text.upper() == "PESO DECLARADO":
+            peso_declarado = valor
+        elif tp.text.upper() == "PESO BASE DE CALCULO":
+            peso_cubado = valor
+        elif tp.text.upper() == "PESO CUBADO":
+            m3 = valor
+
+    cte["peso_declarado"] = peso_declarado
+    cte["peso_cubado"] = peso_cubado
+    cte["m3"] = m3
+
+    valor_cte = root.find(".//ns:vTPrest", ns)
+    cte["valor_cobrado"] = float(valor_cte.text.replace(",", "."))
+
+    v_carga = root.find(".//ns:vCarga", ns)
+    cte["valor_mercadoria"] = float(v_carga.text.replace(",", ".")) if v_carga is not None else 0
+
+    return cte
+
+
+# -------------------------
+# CÁLCULO DO FRETE
+# -------------------------
+def calcular_frete(cte, tabela_frete, tabela_icms):
+    tipo_destino = identificar_tipo_destino(cte["uf_destino"], cte["cidade_destino"])
+
+    linha = tabela_frete[
+        (tabela_frete["uf_destino"] == cte["uf_destino"]) &
+        (tabela_frete["tipo_destino"] == tipo_destino)
     ]
 
     if linha.empty:
-        return 0.0
+        return None
 
-    return float(linha.iloc[0]['valor'])
+    l = linha.iloc[0]
+
+    frete_m3 = cte["m3"] * l["valor_m3"]
+    frete_base = max(frete_m3, l["frete_min"])
+
+    adv = cte["valor_mercadoria"] * l["adv_valor"]
+    taxa = l["taxa"]
+
+    faixas = math.ceil(cte["peso_declarado"] / 100)
+    pedagio = faixas * l["pedagio"]
+
+    subtotal = frete_base + adv + taxa + pedagio
+
+    divisor = obter_divisor_icms(
+        tabela_icms,
+        cte["uf_origem"],
+        cte["uf_destino"]
+    )
+
+    valor_tabela = round(subtotal / divisor, 2)
+    valor_cobrado = round(cte["valor_cobrado"], 2)
+    diferenca = round(valor_cobrado - valor_tabela, 2)
+
+    if abs(diferenca) <= 0.01:
+        status = "OK"
+    elif diferenca > 0:
+        status = "MAIOR"
+    else:
+        status = "MENOR"
+
+    return {
+        "cte": cte["numero"],
+        "origem": cte["origem"],
+        "destino": f"{cte['cidade_destino']}/{cte['uf_destino']}",
+        "valor_tabela": valor_tabela,
+        "valor_cobrado": valor_cobrado,
+        "diferenca": diferenca,
+        "status": status,
+        "memoria": {
+            "frete_m3": frete_m3,
+            "frete_base": frete_base,
+            "adv": adv,
+            "taxa": taxa,
+            "pedagio": pedagio,
+            "divisor_icms": divisor
+        }
+    }
 
 
-# =========================
+# -------------------------
 # ROTAS
-# =========================
-
-@app.route('/')
+# -------------------------
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
 
-@app.route('/processar', methods=['POST'])
+@app.route("/processar", methods=["POST"])
 def processar():
-    if 'xml' not in request.files or 'tabela' not in request.files:
-        return "Erro: selecione os XMLs e a tabela.", 400
+    cliente = request.form.get("cliente")
+    config = CLIENTES.get(cliente)
 
-    xml_files = request.files.getlist('xml')
-    tabela_file = request.files['tabela']
+    tabela_frete = pd.read_csv(os.path.join(BASE_DIR, "tabelas", config["frete"]))
+    tabela_icms = pd.read_csv(os.path.join(BASE_DIR, "tabelas", config["icms"]))
 
-    if not xml_files or tabela_file.filename == '':
-        return "Erro: arquivos não selecionados.", 400
-
-    df_tabela = pd.read_excel(tabela_file)
-    df_tabela.columns = [c.lower() for c in df_tabela.columns]
-
+    arquivos = request.files.getlist("xmls")
     resultados = []
 
-    for xml_file in xml_files:
-        dados = ler_cte_xml(xml_file)
-
-        percurso = f"{dados['origem']} x {dados['destino']}"
-        regiao = identificar_regiao(dados['destino'])
-
-        valor_tabela = buscar_valor_tabela(
-            df_tabela,
-            percurso,
-            regiao,
-            dados['m3']
+    for arq in arquivos:
+        cte = ler_cte_xml(
+            arq,
+            config["origem_nome"],
+            config["uf_origem"]
         )
-
-        diferenca = dados['valor_cobrado'] - valor_tabela
-
-        if diferenca > 0:
-            status = 'A MAIOR'
-        elif diferenca < 0:
-            status = 'A MENOR'
-        else:
-            status = 'OK'
-
-        resultados.append({
-            'cte': dados['cte'],
-            'origem': dados['origem'],
-            'destino': dados['destino'],
-            'peso_cubado': dados['peso_cubado'],
-            'm3': dados['m3'],
-            'valor_tabela': valor_tabela,
-            'valor_cobrado': dados['valor_cobrado'],
-            'diferenca': diferenca,
-            'status': status
-        })
-
-    app.config['ultimo_resultado'] = resultados
-
-    return render_template('resultado.html', resultados=resultados)
-
-
-@app.route('/exportar_excel')
-def exportar_excel():
-    resultados = app.config.get('ultimo_resultado')
-
-    if not resultados:
-        return "Nenhum resultado para exportar.", 400
+        res = calcular_frete(cte, tabela_frete, tabela_icms)
+        if res:
+            resultados.append(res)
 
     df = pd.DataFrame(resultados)
 
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Conferencia')
+    totais = {
+        "total_tabela": round(df["valor_tabela"].sum(), 2),
+        "total_cobrado": round(df["valor_cobrado"].sum(), 2),
+        "total_diferenca": round(df["diferenca"].sum(), 2)
+    }
 
-    output.seek(0)
+    app.config["ULTIMO_RESULTADO"] = resultados
 
-    nome_arquivo = f"conferencia_frete_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name=nome_arquivo,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    return render_template(
+        "resultado.html",
+        resultados=resultados,
+        totais=totais
     )
 
 
-# =========================
-# START
-# =========================
+@app.route("/exportar", methods=["POST"])
+def exportar():
+    resultados = app.config.get("ULTIMO_RESULTADO", [])
 
-if __name__ == '__main__':
-    app.run(debug=True)
+    df = pd.DataFrame([{
+        "CTe": r["cte"],
+        "Origem": r["origem"],
+        "Destino": r["destino"],
+        "Valor Tabela": r["valor_tabela"],
+        "Valor Cobrado": r["valor_cobrado"],
+        "Diferença": r["diferenca"],
+        "Status": r["status"]
+    } for r in resultados])
+
+    output = BytesIO()
+    df.to_excel(output, index=False)
+    output.seek(0)
+
+    return send_file(
+        output,
+        download_name="resultado_frete.xlsx",
+        as_attachment=True
+    )
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
