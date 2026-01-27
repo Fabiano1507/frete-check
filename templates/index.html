@@ -2,81 +2,132 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Conferência de Frete - Britânia</title>
+    <title>VALIDA FRETE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <style>
-        body {
+        * {
+            box-sizing: border-box;
             font-family: Arial, Helvetica, sans-serif;
-            background-color: #f4f6f8;
-            margin: 40px;
         }
 
-        h1 {
-            color: #2c3e50;
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #f2f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         .container {
             background: #ffffff;
-            padding: 30px;
-            border-radius: 8px;
-            max-width: 700px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 520px;
+            padding: 30px 35px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .logo {
+            margin-bottom: 20px;
+        }
+
+        .logo img {
+            max-width: 260px;
+            width: 100%;
+            height: auto;
+        }
+
+        h1 {
+            margin: 10px 0 25px;
+            font-size: 22px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+            text-align: left;
         }
 
         label {
             font-weight: bold;
-            margin-top: 15px;
+            font-size: 14px;
+            color: #444;
             display: block;
+            margin-bottom: 6px;
         }
 
-        input[type="file"] {
-            margin-top: 8px;
-            margin-bottom: 20px;
+        select, input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 14px;
         }
 
         button {
-            background-color: #007bff;
-            color: white;
+            margin-top: 20px;
+            width: 100%;
+            padding: 12px;
+            background: #1e88e5;
+            color: #fff;
             border: none;
-            padding: 12px 20px;
-            font-size: 16px;
-            border-radius: 5px;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: bold;
             cursor: pointer;
         }
 
         button:hover {
-            background-color: #0056b3;
+            background: #1565c0;
         }
 
-        .info {
-            margin-top: 15px;
-            font-size: 14px;
-            color: #555;
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #777;
         }
     </style>
 </head>
-
 <body>
 
-<div class="container">
-    <h1>📦 Conferência de Frete - Britânia</h1>
+    <div class="container">
 
-    <form action="/processar" method="POST" enctype="multipart/form-data">
+        <div class="logo">
+            <img src="{{ url_for('static', filename='Logo.jfif') }}" alt="Logo Valida Frete">
+        </div>
 
-        <label>📄 XML do(s) CT-e</label>
-        <input type="file" name="xml" multiple required>
+        <h1>Validação de Frete</h1>
 
-        <label>📊 Tabela de Frete (Excel)</label>
-        <input type="file" name="tabela" accept=".xlsx,.xls" required>
+        <form action="/processar" method="POST" enctype="multipart/form-data">
 
-        <button type="submit">🔍 Conferir Frete</button>
-    </form>
+            <!-- CLIENTE (CAIXA DE SELEÇÃO COM UMA OPÇÃO POR ENQUANTO) -->
+            <div class="form-group">
+                <label>Cliente</label>
+                <select name="cliente" required>
+				<option value="britania_joinville">Britânia - Joinville/SC</option>
+				<option value="britania_linhares">Britânia - Linhares/ES</option>
+				<option value="dohler">Dohler - Joinville/SC</option>
+				</select>
+            </div>
 
-    <div class="info">
-        ✔ É possível selecionar <b>vários XMLs</b> de uma vez<br>
-        ✔ O cálculo é feito pelo <b>peso cubado</b><br>
-        ✔ Classificação automática em <b>Capital / Interior</b>
+            <!-- UPLOAD DE XMLs -->
+            <div class="form-group">
+                <label>Arquivos XML do CT-e</label>
+                <input type="file" name="xmls" multiple accept=".xml" required>
+            </div>
+
+            <button type="submit">CONFERIR FRETE</button>
+
+        </form>
+
+        <div class="footer">
+            Sistema VALIDA FRETE • Em desenvolvimento
+        </div>
+
     </div>
-</div>
 
 </body>
 </html>
